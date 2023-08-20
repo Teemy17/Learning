@@ -8,7 +8,7 @@ def number_to_words(number):
     elif 10 <= number < 20:
         return teens[number - 10]
     elif 20 <= number < 100:
-        return (f"{tens[number // 10]} {ones[number % 10]}")
+        return (f"{tens[number // 10]}-{ones[number % 10]}") if number % 10 != 0 else tens[number // 10]
     elif 100 <= number < 1000:
         return (f"{ones[number // 100]} hundred and {number_to_words(number % 100)}")
     elif number == 0:
