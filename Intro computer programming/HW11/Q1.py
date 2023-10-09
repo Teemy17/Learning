@@ -65,6 +65,6 @@ class Alarmclock(Clock):
 
 alarm_clock = Alarmclock(12, 1, 50)
 
-alarm_clock.setAlarmTime(12, 1, 55)
+alarm_clock.setAlarmTime(12, 2, 5)
 alarm_clock.alarmOn()
 alarm_clock.run()
