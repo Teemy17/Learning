@@ -26,6 +26,7 @@ class PlayButton(BaseButton):
             song_info = self.app.directory_list[self.app.song_list.curselection()[0]]
             mixer.music.load(song_info['path'] + song_info['song'])
             mixer.music.play()
+            
             self.app.current_song_index = self.app.song_list.curselection()[0]
             song_type = MP3(song_info['path'] + song_info['song'])
             self.app.song_length = song_type.info.length
