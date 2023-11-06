@@ -89,7 +89,7 @@ class SavingsAccount:
     
 class OverdrawnAccount(SavingsAccount):
     def __init__(self, bank_name, acc_name, acc_id, balance, transaction_history, overdrawn_limit):
-        super.__init__(self, bank_name, acc_name, acc_id, balance, transaction_history)
+        super().__init__(bank_name, acc_name, acc_id, balance, transaction_history)
         self.overdrawn_limit = overdrawn_limit
 
     def withdrawn(self, money, person, date):
