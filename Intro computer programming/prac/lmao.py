@@ -71,7 +71,7 @@ class SavingsAccount:
         self.transaction_history = transaction_history
 
     def deposit(self, money, person, date):
-        self_balace += money
+        self.balance += money
         self.transaction_history.append(f"Money deposit: {money}, Person: {person}, date: {date}")
 
     def withdrawn(self, money, person, date):
