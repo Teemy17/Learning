@@ -9,20 +9,34 @@ from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, APIC
 import io
+import pygame
 
 
 class BaseButton:
-    def __init__(self, root, app, image_path, x, y):
+    def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
         self.app = app
         self.button = Button(root, highlightthickness=0, bd=0)
         self.button_img = ImageTk.PhotoImage(
-            Image.open(image_path).resize((80, 80), Image.LANCZOS)
+            Image.open(image_path).resize(button_size, Image.LANCZOS)
         )
         self.button.config(image=self.button_img, command=self.action)
         self.button.place(x=x, y=y)
 
     def action(self):
         pass
+
+    def get_album_art(self, song_path):
+        audio = MP3(song_path, ID3=ID3)
+        album_art = None
+        for tag in audio.tags.values():
+            if tag.FrameID.startswith("APIC"):
+                if tag.mime.startswith("image/jpeg"):
+                    album_art = tag
+                break
+        if album_art:
+            return album_art
+        else:
+            return None
 
 
 class PlayButton(BaseButton):
@@ -42,19 +56,6 @@ class PlayButton(BaseButton):
             SongDuration(self.app).song_duration_time()
         else:
             messagebox.showerror("Error", "Please select a song to play")
-
-    def get_album_art(self, song_path):
-        audio = MP3(song_path, ID3=ID3)
-        album_art = None
-        for tag in audio.tags.values():
-            if tag.FrameID.startswith("APIC"):  # Check for any APIC frame
-                if tag.mime.startswith("image/jpeg"):  # Check for JPEG image
-                    album_art = tag
-                break
-        if album_art:
-            return album_art
-        else:
-            return None
 
 
 class PauseButton(BaseButton):
@@ -76,6 +77,9 @@ class StopButton(BaseButton):
         self.app.paused = False
         SongDuration(self.app)
 
+        if isinstance(self.app.btAutoPlay_img, AutoPlayButton):
+            self.app.btAutoPlay_img.disable_autoplay()
+
 
 class NextButton(BaseButton):
     def action(self):
@@ -96,19 +100,6 @@ class NextButton(BaseButton):
         else:
             print("No more songs in the list")
 
-    def get_album_art(self, song_path):
-        audio = MP3(song_path, ID3=ID3)
-        album_art = None
-        for tag in audio.tags.values():
-            if tag.FrameID.startswith("APIC"):  # Check for any APIC frame
-                if tag.mime.startswith("image/jpeg"):  # Check for JPEG image
-                    album_art = tag
-                break
-        if album_art:
-            return album_art
-        else:
-            return None
-
 
 class PrevButton(BaseButton):
     def action(self):
@@ -128,21 +119,11 @@ class PrevButton(BaseButton):
         else:
             print("This is the first song in the list")
 
-    def get_album_art(self, song_path):
-        audio = MP3(song_path, ID3=ID3)
-        album_art = None
-        for tag in audio.tags.values():
-            if tag.FrameID.startswith("APIC"):  # Check for any APIC frame
-                if tag.mime.startswith("image/jpeg"):  # Check for JPEG image
-                    album_art = tag
-                break
-        if album_art:
-            return album_art
-        else:
-            return None
-
 
 class DeleteButton(BaseButton):
+    def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
+        super().__init__(root, app, image_path, x, y, button_size)
+
     def action(self):
         selected_index = self.app.song_list.curselection()
         if selected_index:
@@ -150,9 +131,59 @@ class DeleteButton(BaseButton):
             if selected_index[0] == self.app.current_song_index:
                 mixer.music.stop()
             self.app.song_list.delete(selected_index[0])
+            SongDuration(self.app)
             print(f"Deleted song: {selected_song}")
         else:
             messagebox.showerror("Error", "Please select a song to delete")
+
+class AutoPlayButton(BaseButton):
+    def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
+        super().__init__(root, app, image_path, x, y, button_size)
+        self.autoplay_enabled = False
+        self.root = root
+
+    def action(self):
+        self.toggle_autoplay()
+        print("Autoplay enabled")
+
+    def toggle_autoplay(self):
+        self.autoplay_enabled = not self.autoplay_enabled
+        if self.autoplay_enabled:
+            self.play_next_song_after_delay()
+            print("Autoplay will start after the current song ends")
+
+    def play_next_song_after_delay(self):
+        self.root.after(100, self.check_music_status)
+
+    def disable_autoplay(self):
+        self.autoplay_enabled = False
+        print("Autoplay disabled")
+
+    def check_music_status(self):
+        if not pygame.mixer.music.get_busy():
+            self.play_next_song()
+        if self.autoplay_enabled:
+            self.root.after(100, self.check_music_status)
+
+    def play_next_song(self):
+        if self.autoplay_enabled:
+            if self.app.current_song_index + 1 < len(self.app.directory_list):
+                next_song_index = self.app.current_song_index + 1
+                song_info = self.app.directory_list[next_song_index]
+                pygame.mixer.music.load(song_info["path"] + song_info["song"])
+                pygame.mixer.music.play()
+                self.app.current_song_index = next_song_index
+                self.app.song_list.select_clear(0, END)
+                self.app.song_list.select_set(next_song_index)
+                self.app.song_list.activate(next_song_index)
+
+                album_art = self.get_album_art(song_info["path"] + song_info["song"])
+                self.app.display_album_art(album_art)
+
+                SongDuration(self.app).song_duration_time()
+            else:
+                print("No more songs in the list")
+                self.autoplay_enabled = False
 
 
 class App:
@@ -179,11 +210,15 @@ class App:
             self.window, self, "Python project/Images/prev.png", 150, 250
         )
         self.btDelete_img = DeleteButton(
-            self.window, self, "Python project/Images/delete.png", 700, 250
+            self.window, self, "Python project/Images/delete.png", 700, 250, (50, 50)
+        )
+        self.btAutoPlay_img = AutoPlayButton(
+            self.window, self, "Python project/Images/autoplay.png", 700, 300, (50, 50)
         )
 
         self.current_song_index = 0
         self.paused = False
+        self.autoplay = False
 
         self.song_duration_bar = 0
         self.song_length = 0
@@ -233,7 +268,7 @@ class App:
     def add_song(self):
         songs = filedialog.askopenfilenames(
             title="Select one or multiple song",
-            filetypes=(("MP3 files", "*.mp3"), ("WAV files", "*.wav")),
+            filetypes=(("MP3 files", "*mp3"), ("WAV files","*.wav"))
         )
         for song in songs:
             song_name = os.path.basename(song)
@@ -265,14 +300,12 @@ class App:
         if album_art is not None:
             img_data = album_art.data
             img = Image.open(io.BytesIO(img_data))
-            img = img.resize(
-                (150, 150), Image.LANCZOS
-            )  # Resize the album art as needed
+            img = img.resize((150, 150), Image.LANCZOS)
             album_art_img = ImageTk.PhotoImage(img)
             self.album_art_label.config(image=album_art_img)
             self.album_art_label.image = album_art_img
         else:
-            default_img_path = "Python project/Images/default.png"  
+            default_img_path = "Python project/Images/default.png"
             default_img = Image.open(default_img_path)
             default_img = default_img.resize((150, 150), Image.LANCZOS)
 
@@ -291,6 +324,7 @@ class App:
         pass
 
 
+
 class SongDuration:
     def __init__(self, app):
         self.app = app
@@ -303,7 +337,7 @@ class SongDuration:
             width=25,
         )
         self.song_duration_bar.place(x=220, y=400)
-        self.update_thread = None  # Initialize the update thread
+        self.update_thread = None
 
     def start_update_thread(self):
         if not self.update_thread:
