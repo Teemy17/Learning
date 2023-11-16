@@ -122,11 +122,6 @@ class App:
         volume = int(val)/100
         mixer.music.set_volume(volume)
 
-    def mute(self):
-        mixer.music.set_volume(0)
-        self.volume_slider.set(0)
-
-
     def duration_bar(self):
         pass
 
@@ -135,12 +130,6 @@ class App:
         pass
 
 
-    def Delete(self):
-        pass
-
-    
-        
-        
 if __name__ == "__main__":
     window = Tk()
     window.title("Music Player")

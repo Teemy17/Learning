@@ -6,10 +6,10 @@ from PIL import ImageTk, Image
 import time
 import threading
 from mutagen.mp3 import MP3
-from mutagen.flac import FLAC
 from mutagen.id3 import ID3, APIC
 import io
 import pygame
+import random
 
 
 class BaseButton:
@@ -61,6 +61,14 @@ class PlayButton(BaseButton):
 class PauseButton(BaseButton):
     def action(self):
         if self.app.paused == False:
+            if (
+                isinstance(self.app.btAutoPlay_img, AutoPlayButton)
+                and self.app.btAutoPlay_img.autoplay_enabled
+            ):
+                self.app.autoplay_paused = True
+                self.app.btAutoPlay_img.disable_autoplay()
+            else:
+                self.app.autoplay_paused = False
             self.app.paused = True
             mixer.music.pause()
             SongDuration(self.app).song_duration_time()
@@ -68,6 +76,9 @@ class PauseButton(BaseButton):
             self.app.paused = False
             mixer.music.unpause()
             SongDuration(self.app).song_duration_time()
+            if self.app.autoplay_paused:
+                self.app.btAutoPlay_img.toggle_autoplay()
+            self.app.autoplay_paused = False
 
 
 class StopButton(BaseButton):
@@ -129,12 +140,13 @@ class DeleteButton(BaseButton):
         if selected_index:
             selected_song = self.app.directory_list.pop(selected_index[0])
             if selected_index[0] == self.app.current_song_index:
-                mixer.music.stop()
+                StopButton.action(self)
             self.app.song_list.delete(selected_index[0])
             SongDuration(self.app)
             print(f"Deleted song: {selected_song}")
         else:
             messagebox.showerror("Error", "Please select a song to delete")
+
 
 class AutoPlayButton(BaseButton):
     def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
@@ -143,14 +155,16 @@ class AutoPlayButton(BaseButton):
         self.root = root
 
     def action(self):
-        self.toggle_autoplay()
-        print("Autoplay enabled")
+        if not self.autoplay_enabled:
+            self.enable_autoplay()
+            print("Autoplay enabled")
+        else:
+            self.disable_autoplay()
 
-    def toggle_autoplay(self):
-        self.autoplay_enabled = not self.autoplay_enabled
-        if self.autoplay_enabled:
-            self.play_next_song_after_delay()
-            print("Autoplay will start after the current song ends")
+    def enable_autoplay(self):
+        self.autoplay_enabled = True
+        self.play_next_song_after_delay()
+        print("Autoplay will start after the current song ends")
 
     def play_next_song_after_delay(self):
         self.root.after(100, self.check_music_status)
@@ -185,6 +199,12 @@ class AutoPlayButton(BaseButton):
                 print("No more songs in the list")
                 self.autoplay_enabled = False
 
+class ShuffleButton(BaseButton):
+    def __init__(self, root, app, image_path, x, y, button_size=(80, 80)):
+        super().__init__(root, app, image_path, x, y, button_size)
+
+    def action(self):
+        pass
 
 class App:
     def __init__(self, root):
@@ -215,6 +235,9 @@ class App:
         self.btAutoPlay_img = AutoPlayButton(
             self.window, self, "Python project/Images/autoplay.png", 700, 300, (50, 50)
         )
+        # self.btShuffle_img = ShuffleButton(
+        #     self.window, self, "Python project/Images/shuffle.png", 700, 350, (50, 50)
+        # )
 
         self.current_song_index = 0
         self.paused = False
@@ -267,8 +290,7 @@ class App:
 
     def add_song(self):
         songs = filedialog.askopenfilenames(
-            title="Select one or multiple song",
-            filetypes=(("MP3 files", "*mp3"), ("WAV files","*.wav"))
+            title="Select one or multiple song", filetypes=[("mp3 Files", "*.mp3")]
         )
         for song in songs:
             song_name = os.path.basename(song)
@@ -324,7 +346,6 @@ class App:
         pass
 
 
-
 class SongDuration:
     def __init__(self, app):
         self.app = app
@@ -367,6 +388,10 @@ class SongDuration:
         minutes, seconds = divmod(int(time_in_seconds), 60)
         hours, minutes = divmod(minutes, 60)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+class DurationBar:
+    def __init__(self, app):
+        self.app
 
 
 if __name__ == "__main__":
